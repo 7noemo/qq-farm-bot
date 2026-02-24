@@ -2,10 +2,15 @@ name: Build And Push Docker Image
 
 on:
   workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Optional Version Tag (e.g., v1.0.0)'
+        required: false
+        default: ''
+        type: string
   push:
-    # 仅在推送 v 开头的 tag 时触发构建 (如 v2.0.0)
     tags:
-      - 'v*' 
+      - 'v*'
 
 jobs:
   build:
@@ -15,7 +20,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set time zone
         uses: szenius/set-timezone@v1.0
         with:
@@ -36,28 +41,26 @@ jobs:
           images: |
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/qq-farm-bot
           tags: |
-            type=schedule,pattern=nightly
-            type=edge
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
             type=raw,value=latest
+            ${{ inputs.version_tag }}
+            type=ref,event=tag
+          flavor: |
+            latest=true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
 
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v4
         with:
           context: .
-          # Dockerfile 使用的 node:20-alpine 原生支持这两个架构
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
